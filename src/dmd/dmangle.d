@@ -734,6 +734,11 @@ public:
 
     override void visit(AggregateDeclaration ad)
     {
+        if (ad.mangleOverride)
+        {
+            buf.writestring(ad.mangleOverride);
+            return;
+        }
         ClassDeclaration cd = ad.isClassDeclaration();
         Dsymbol parentsave = ad.parent;
         if (cd)

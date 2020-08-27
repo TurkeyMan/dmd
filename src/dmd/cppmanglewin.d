@@ -963,7 +963,11 @@ private:
         else
         {
             // Not a template
-            name = sym.ident.toChars();
+            auto agg = sym.isAggregateDeclaration();
+            if (agg && agg.mangleOverride)
+                name = agg.mangleOverride.ptr;
+            else
+                name = sym.ident.toChars();
         }
         assert(name);
         if (is_dmc_template)

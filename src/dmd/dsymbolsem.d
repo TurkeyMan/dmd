@@ -543,6 +543,11 @@ private uint setMangleOverride(Dsymbol s, const(char)[] sym)
         s.isDeclaration().mangleOverride = sym;
         return 1;
     }
+    else if (auto agg = s.isAggregateDeclaration())
+    {
+        agg.mangleOverride = sym;
+        return 1;
+    }
 
     if (auto ad = s.isAttribDeclaration())
     {

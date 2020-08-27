@@ -89,6 +89,9 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     /// Only valid for class and struct. TODO: Merge with ClassKind ?
     CPPMANGLE cppmangle;
 
+    // overridden symbol with pragma(mangle, "...")
+    const(char)[] mangleOverride;
+
     /**
      * !=null if is nested
      * pointing to the dsymbol that directly enclosing it.
