@@ -2076,6 +2076,70 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
         d.storage_class |= STC.rvalue;
         return new VarExp(e.loc, d);
     }
+    if (e.ident == Id.vtblSymbol)
+    {
+        // https://dlang.org/spec/traits.html#vtblSymbol
+        if (dim != 1)
+            return dimError(1);
+        auto o = (*e.args)[0];
+        Type t = isType(o);
+        auto tc = t ? t.toBasetype().isTypeClass() : null;
+        auto cd = tc ? tc.sym : null;
+        if (!cd)
+        {
+            eSink.error(e.loc, "class type expected as argument to __traits(vtblSymbol) instead of `%s`", o.toErrMsg());
+            return ErrorExp.get();
+        }
+        // see isOpaqueSymbolSlice() in dinterpret.d
+        Declaration d = new SymbolDeclaration(cd.loc, cd);
+        d.type = Type.tvoidptr.arrayOf().constOf();
+        d.storage_class |= STC.rvalue;
+        return new VarExp(e.loc, d);
+    }
+    if (e.ident == Id.getInterfaces)
+    {
+        // https://dlang.org/spec/traits.html#getInterfaces
+        if (dim != 1)
+            return dimError(1);
+        auto o = (*e.args)[0];
+        auto s = getDsymbol(o);
+        auto cd = s ? s.isClassDeclaration() : null;
+        if (!cd)
+        {
+            eSink.error(e.loc, "class or interface expected as argument to __traits(getInterfaces) instead of `%s`", o.toErrMsg());
+            return ErrorExp.get();
+        }
+        if (!cd.vtblInterfaces)
+            cd.size(e.loc);
+        if (!cd.vtblInterfaces)
+        {
+            eSink.error(e.loc, "%s `%s` is forward referenced in __traits(getInterfaces)", cd.kind, cd.toPrettyChars());
+            return ErrorExp.get();
+        }
+        // The Interface[] array following the ClassInfo, see ClassInfoToDt() in toobj.d
+        Type tinterface;
+        if (auto ti = Type.typeinfoclass)
+        {
+            if (auto m = ti.parent ? ti.parent.isModule() : null)
+            {
+                if (auto sym = m.search(e.loc, Identifier.idPool("Interface")))
+                {
+                    if (auto sd = sym.isStructDeclaration())
+                        tinterface = sd.type;
+                }
+            }
+        }
+        if (!tinterface)
+        {
+            eSink.error(e.loc, "`object.Interface` could not be found, but is needed for __traits(getInterfaces)");
+            return ErrorExp.get();
+        }
+        // see isOpaqueSymbolSlice() in dinterpret.d
+        Declaration d = new SymbolDeclaration(cd.loc, cd);
+        d.type = tinterface.arrayOf().constOf();
+        d.storage_class |= STC.rvalue;
+        return new VarExp(e.loc, d);
+    }
     if (e.ident == Id.isZeroInit)
     {
         if (dim != 1)

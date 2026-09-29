@@ -756,11 +756,29 @@ elem* toElem(Expression e, ref IRState irs)
 
         Symbol* s = toSymbolNRVO(se.var);
 
-        // VarExp generated for `__traits(initSymbol, Aggregate)`?
+        // VarExp generated for __traits(initSymbol), __traits(vtblSymbol) or __traits(getInterfaces)?
         if (auto symDec = se.var.isSymbolDeclaration())
         {
             if (auto ta = se.type.isTypeDArray())
             {
+                if (ta.nextOf().toBasetype().ty == Tpointer)     // __traits(vtblSymbol, Class): const(void*)[]
+                {
+                    auto cd = symDec.dsym.isClassDeclaration();
+                    auto slice = el_pair(TYdarray, el_long(TYsize_t, cd.vtbl.length), el_ptr(toVtblSymbol(cd)));
+                    elem_setLoc(slice, se.loc);
+                    return slice;
+                }
+                if (ta.nextOf().toBasetype().ty == Tstruct)      // __traits(getInterfaces, Class): const(Interface)[]
+                {
+                    auto cd = symDec.dsym.isClassDeclaration();
+                    elem* ptr = cd.vtblInterfaces.length
+                        ? el_bin(OPadd, TYnptr, el_ptr(toSymbol(cd)), el_long(TYsize_t, classInfoSize()))
+                        : el_long(TYnptr, 0);
+                    auto slice = el_pair(TYdarray, el_long(TYsize_t, cd.vtblInterfaces.length), ptr);
+                    elem_setLoc(slice, se.loc);
+                    return slice;
+                }
+
                 // Type must be const(void)[] or const(void[])
                 assert(ta.nextOf() == Type.tvoid.constOf(), se.type.toString());
 

@@ -2219,12 +2219,15 @@ public:
         }
         else if (SymbolDeclaration s = d.isSymbolDeclaration())
         {
-            // exclude void[]-typed `__traits(initSymbol)`
-            if (auto ta = s.type.toBasetype().isTypeDArray())
+            // __traits(initSymbol) etc., see isOpaqueSymbolSlice()
+            if (s.type.toBasetype().isTypeDArray())
             {
-                assert(ta.next.ty == Tvoid);
-                eSink.error(loc, "cannot determine the address of the initializer symbol during CTFE");
-                return CTFEExp.cantexp;
+                if (goal == CTFEGoal.LValue)
+                {
+                    eSink.error(loc, "cannot determine the address of the initializer symbol during CTFE");
+                    return CTFEExp.cantexp;
+                }
+                return new VarExp(loc, d);
             }
 
             // Struct static initializers, for example
@@ -5003,6 +5006,12 @@ public:
         assert(e1);
         if (exceptionOrCant(e1))
             return;
+        if (auto sd = isOpaqueSymbolSlice(e1))
+        {
+            emplaceExp!(IntegerExp)(pue, e.loc, opaqueSymbolSliceLength(sd), e.type);
+            result = pue.exp();
+            return;
+        }
         if (e1.op != EXP.string_ && e1.op != EXP.arrayLiteral && e1.op != EXP.slice && e1.op != EXP.null_)
         {
             eSink.error(e.loc, "`%s` cannot be evaluated at compile time", e.toErrMsg());
@@ -5198,7 +5207,10 @@ public:
         {
             if (e1.op != EXP.arrayLiteral && e1.op != EXP.string_ && e1.op != EXP.slice && e1.op != EXP.vector)
             {
-                eSink.error(e.loc, "cannot determine length of `%s` at compile time", e.e1.toErrMsg());
+                if (isOpaqueSymbolSlice(e1))
+                    eSink.error(e.loc, "cannot read the contents of `%s` at compile time, they are only known at link time", e.e1.toErrMsg());
+                else
+                    eSink.error(e.loc, "cannot determine length of `%s` at compile time", e.e1.toErrMsg());
                 return false;
             }
             len = resolveArrayLength(e1);
@@ -5436,7 +5448,10 @@ public:
         {
             if (e1.op != EXP.arrayLiteral && e1.op != EXP.string_ && e1.op != EXP.null_ && e1.op != EXP.slice && e1.op != EXP.vector)
             {
-                eSink.error(e.loc, "cannot determine length of `%s` at compile time", e1.toErrMsg());
+                if (isOpaqueSymbolSlice(e1))
+                    eSink.error(e.loc, "cannot read the contents of `%s` at compile time, they are only known at link time", e1.toErrMsg());
+                else
+                    eSink.error(e.loc, "cannot determine length of `%s` at compile time", e1.toErrMsg());
                 result = CTFEExp.cantexp;
                 return;
             }
@@ -5665,6 +5680,13 @@ public:
         if (exceptionOrCant(e1))
             return;
         // If the expression has been cast to void, do nothing.
+        if (e.to.toBasetype().isTypeDArray() && isOpaqueSymbolSlice(e1))
+        {
+            auto ve = new VarExp(e.loc, e1.isVarExp().var);
+            ve.type = e.type;
+            result = ve;
+            return;
+        }
         if (e.to.ty == Tvoid)
         {
             result = CTFEExp.voidexp;
@@ -7677,4 +7699,32 @@ private void removeHookTraceImpl(ref CallExp ce, ref FuncDeclaration fd)
         auto eSink = global.errorSink;
         eSink.message(Loc.initial, "strip     %s =>\n          %s", oldCE.toChars(), ce.toChars());
     }
+}
+
+/***********************************
+ * Determine if e is a slice of a symbol whose contents are only known at link time,
+ * i.e. __traits(initSymbol), __traits(vtblSymbol) or __traits(getInterfaces).
+ * CTFE cannot read it, but can pass it through and knows its length.
+ * Params:
+ *      e = expression to check
+ * Returns:
+ *      the symbol, null if not
+ */
+SymbolDeclaration isOpaqueSymbolSlice(Expression e)
+{
+    auto ve = e.isVarExp();
+    auto sd = ve ? ve.var.isSymbolDeclaration() : null;
+    return sd && sd.type.toBasetype().isTypeDArray() ? sd : null;
+}
+
+/// Returns: length of the slice, see isOpaqueSymbolSlice()
+ulong opaqueSymbolSliceLength(SymbolDeclaration sd)
+{
+    auto ta = sd.type.toBasetype().isTypeDArray();
+    if (ta.next.ty == Tvoid)                    // __traits(initSymbol)
+        return sd.dsym.structsize;
+    auto cd = sd.dsym.isClassDeclaration();
+    if (ta.next.ty == Tpointer)                 // __traits(vtblSymbol)
+        return cd.vtbl.length;
+    return cd.vtblInterfaces.length;            // __traits(getInterfaces)
 }

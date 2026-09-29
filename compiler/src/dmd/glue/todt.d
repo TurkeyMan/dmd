@@ -579,6 +579,31 @@ void Expression_toDt(Expression e, ref DtBuilder dtb)
 
         if (auto sd = e.var.isSymbolDeclaration())
         {
+            if (auto ta = sd.type.toBasetype().isTypeDArray())
+            {
+                // see isOpaqueSymbolSlice() in dinterpret.d
+                if (ta.next.ty == Tvoid)                    // __traits(initSymbol, T): const(void)[]
+                {
+                    dtb.size(sd.dsym.structsize);
+                    dtb.xoff(toInitializer(sd.dsym), 0);
+                }
+                else if (ta.next.ty == Tpointer)            // __traits(vtblSymbol, T): const(void*)[]
+                {
+                    auto cd = sd.dsym.isClassDeclaration();
+                    dtb.size(cd.vtbl.length);
+                    dtb.xoff(toVtblSymbol(cd), 0);
+                }
+                else                                        // __traits(getInterfaces, T): const(Interface)[]
+                {
+                    auto cd = sd.dsym.isClassDeclaration();
+                    dtb.size(cd.vtblInterfaces.length);
+                    if (cd.vtblInterfaces.length)
+                        dtb.xoff(toSymbol(cd), classInfoSize());
+                    else
+                        dtb.size(0);
+                }
+                return;
+            }
             if (sd.dsym)
             {
 
