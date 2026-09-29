@@ -756,6 +756,8 @@ void templateDeclarationSemantic(Scope* sc, TemplateDeclaration tempdecl)
     {
         if (tempdecl.ident == Id.RTInfo)
             Type.rtinfo = tempdecl;
+        if (tempdecl.ident == Id.ClassInfoOf)
+            Type.classinfoOf = tempdecl;
     }
 
     /* Remember Scope for later instantiations, but make

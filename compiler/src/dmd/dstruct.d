@@ -30,7 +30,7 @@ import dmd.visitor;
 enum StructFlags : int
 {
     none        = 0x0,
-    hasPointers = 0x1, // NB: should use noPointers as in ClassFlags
+    hasPointers = 0x1, // NB: should use noPointers as in object.TypeInfo_Class.ClassFlags
 }
 
 /***********************************************************

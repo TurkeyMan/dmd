@@ -1647,7 +1647,11 @@ private extern(C++) final class Semantic3Visitor : Visitor
         if (sd)
             sd.semanticTypeInfoMembers();
         else
+        {
             ad.semanticRTInfo();
+            if (auto cd = ad.isClassDeclaration())
+                cd.semanticClassInfo();
+        }
         ad.semanticRun = PASS.semantic3done;
     }
 
@@ -1984,4 +1988,57 @@ private void findClosureVars(FuncDeclaration fd, scope void delegate(FuncDeclara
             }
         }
     }
+}
+
+/******************************
+ * Build the ClassInfo of cd by evaluating object.ClassInfoOf!T() at compile time.
+ * It is emitted by ClassInfoToDt() in toobj.d.
+ * Params:
+ *      cd = class or interface
+ */
+void semanticClassInfo(ClassDeclaration cd)
+{
+    if (global.errors)          // no codegen, and avoid follow-on errors
+        return;
+    if (cd.classInfoExp || !Type.classinfoOf || !Type.typeinfoclass)
+        return;
+    if (cd.classKind == ClassKind.objc)
+        return;
+    if (!cd.rtInfoScope || !cd.type || cd.type.ty == Terror)
+        return;
+
+    // Evaluate: ClassInfoOf!type()
+    auto tiargs = new Objects(cd.type);
+    auto ti = new TemplateInstance(cd.loc, Type.classinfoOf, tiargs);
+
+    auto sc = cd.rtInfoScope;
+    Scope* sc3 = ti.tempdecl._scope.startCTFE();
+    sc3.tinst = sc.tinst;
+    sc3.minst = sc._module.importedFrom;    // see semanticRTInfo()
+    if (cd.isDeprecated())
+        sc3.stc |= STC.deprecated_;
+
+    ti.dsymbolSemantic(sc3);
+    if (auto fd = ti.toAlias().isFuncDeclaration())
+        fd.skipCodegen = true;      // only evaluated at compile time
+    ti.semantic2(sc3);
+    ti.semantic3(sc3);
+    Expression e = symbolToExp(ti.toAlias(), cd.loc, sc3, false);
+    e = new CallExp(cd.loc, e);
+    e = e.expressionSemantic(sc3);
+    sc3.endCTFE();
+    if (e.op == EXP.error)
+        return;
+
+    e = e.ctfeInterpret();
+    if (e.op == EXP.error)
+        return;
+    auto cre = e.isClassReferenceExp();
+    if (!cre || cre.originalClass() !is Type.typeinfoclass)
+    {
+        global.errorSink.error(cd.loc, "%s `%s`: `object.ClassInfoOf!(%s)()` must return a `new TypeInfo_Class`, not `%s`",
+            cd.kind, cd.toPrettyChars, cd.type.toChars(), e.toChars());
+        return;
+    }
+    cd.classInfoExp = e;
 }

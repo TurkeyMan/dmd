@@ -2,7 +2,7 @@
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/fail308.d(18): Error: template instance `object.RTInfo!(TestType)` recursive expansion
+$r:.*object\.d\(\d+\): Error: template instance `object\.\w+!\(MinHeap!\(TestType\).*` recursive expansion$
 ---
 */
 

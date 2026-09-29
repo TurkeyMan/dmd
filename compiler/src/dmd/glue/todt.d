@@ -822,7 +822,7 @@ private void membersToDt(AggregateDeclaration ad, ref DtBuilder dtb,
     if (cd)
     {
         const bool gentypeinfo = global.params.useTypeInfo && Type.dtypeinfo;
-        const bool genclassinfo = gentypeinfo || !(cd.isCPPclass || cd.isCOMclass);
+        const bool genclassinfo = Type.typeinfoclass && Type.classinfoOf && (gentypeinfo || !(cd.isCPPclass || cd.isCOMclass));
 
         if (ClassDeclaration cdb = cd.baseClass)
         {

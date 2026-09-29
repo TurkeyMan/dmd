@@ -21,6 +21,7 @@ import dmd.arraytypes;
 import dmd.astenums;
 import dmd.declaration;
 import dmd.dsymbol;
+import dmd.expression;
 import dmd.func;
 import dmd.id;
 import dmd.identifier;
@@ -74,22 +75,6 @@ extern (C++) struct BaseClass
         }
         //printf("-copyBaseInterfaces\n");
     }
-}
-
-// These must match the values in druntime/src/object.d
-enum ClassFlags : uint
-{
-    none          = 0x0,
-    isCOMclass    = 0x1,
-    noPointers    = 0x2,
-    hasOffTi      = 0x4,
-    hasCtor       = 0x8,
-    hasGetMembers = 0x10,
-    hasTypeInfo   = 0x20,
-    isAbstract    = 0x40,
-    isCPPclass    = 0x80,
-    hasDtor       = 0x100,
-    hasNameSig    = 0x200,
 }
 
 /***********************************************************
@@ -396,6 +381,9 @@ extern (C++) class ClassDeclaration : AggregateDeclaration
     {
         return "class";
     }
+
+    /// ClassInfo instance built by object.ClassInfoOf!T, see semanticClassInfo()
+    Expression classInfoExp;
 
     // Back end
     Dsymbol vtblsym;

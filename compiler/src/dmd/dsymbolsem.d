@@ -6148,6 +6148,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             scx = idec._scope; // save so we don't make redundant copies
             idec._scope = null;
         }
+        idec.rtInfoScope = sc;
+        sc.setNoFree();
 
         if (!idec.parent)
         {
