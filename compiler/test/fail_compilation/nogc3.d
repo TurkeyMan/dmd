@@ -54,19 +54,19 @@ fail_compilation/nogc3.d(68):        `x` declared here
 @nogc auto testClosure1()
 {
     int x;
-    int bar() { return x; }
+    int bar() { return x++; }
     return &bar;
 }
 @nogc void testClosure2()
 {
     int x;
-    int bar() { return x; }
+    int bar() { return x++; }
     takeDelegate2(&bar);     // no error
 }
 @nogc void testClosure3()
 {
     int x;
-    int bar() { return x; }
+    int bar() { return x++; }
     takeDelegate3(&bar);
 }
 

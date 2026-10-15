@@ -20,7 +20,7 @@ auto bar(int a) nothrow @safe
 {
     auto f()
     {
-        return a;
+        return a++;
     }
     return Forward!f();
 }

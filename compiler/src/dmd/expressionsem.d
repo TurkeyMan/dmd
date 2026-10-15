@@ -17427,6 +17427,38 @@ Expression addDtorHook(Expression e, Scope* sc)
 }
 
 /*******************************
+ * The lvalue `e` is being used as one (assigned to, its address taken, bound
+ * to a `ref`...). Note that on the variable it is, if any, looking through
+ * the expressions that forward lvalue-ness without a dereference.
+ * See `FuncDeclaration.contextVar`.
+ */
+void markLvalueUse(Expression e)
+{
+    while (e)
+    {
+        if (auto ve = e.isVarExp())
+        {
+            if (auto vd = ve.var.isVarDeclaration())
+                vd.usedAsLvalue = true;
+            return;
+        }
+        else if (auto ce = e.isCastExp())
+            e = ce.e1;
+        else if (auto ce = e.isCommaExp())
+            e = ce.e2;
+        else if (auto ce = e.isCondExp())
+        {
+            markLvalueUse(ce.e1);
+            e = ce.e2;
+        }
+        else if (auto ve = e.isVectorArrayExp())
+            e = ve.e1;
+        else
+            return;
+    }
+}
+
+/*******************************
  * Try to convert an expression to be an lvalue.
  *
  * Give error if we are not an lvalue.
@@ -17536,6 +17568,7 @@ Expression toLvalue(Expression _this, Scope* sc, const(char)* action, Expression
             eSink.error(_this.loc, "cannot %s operator `$`", action);
             return ErrorExp.get();
         }
+        markLvalueUse(_this);
         return _this;
     }
 
@@ -17605,6 +17638,7 @@ Expression toLvalue(Expression _this, Scope* sc, const(char)* action, Expression
                     "using the result of a cast from `%s` to `%s` as an lvalue",
                     e1.type, to);
 
+            markLvalueUse(_this.e1);
             return _this;
         }
         return visit(_this);

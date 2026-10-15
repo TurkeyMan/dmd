@@ -14,10 +14,10 @@ struct S
     int delegate() both(int local) @nogc { return () => x + local; }
 
     // the this-only lambda is fine, the other one still needs a closure
-    void two(int local) @nogc
+    void two(double local) @nogc
     {
         int delegate() a = () => x;
-        int delegate() b = () => local;
+        double delegate() b = () => local;
     }
 
     // no closure: only `this` is captured

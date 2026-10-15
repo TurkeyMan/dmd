@@ -47,6 +47,6 @@ void main() @nogc
 auto gcClosure()
 {
     int x;
-    int bar() { return x; }
+    int bar() { return x++; }
     return &bar;
 }

@@ -3364,6 +3364,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     {
                         dsym.storage_class |= STC.nodtor;
                         exp = exp.expressionSemantic(sc);
+                        markLvalueUse(exp);     // the `ref` aliases the variable
                         Type tp = dsym.type;
                         Type ta = exp.type;
                         if (!exp.isLvalue())

@@ -43,6 +43,7 @@ import dmd.astenums;
 import dmd.attrib;
 import dmd.dclass;
 import dmd.declaration;
+import dmd.expression;
 import dmd.dmdparams;
 import dmd.dmodule;
 import dmd.dstruct;
@@ -211,12 +212,30 @@ elem* getEthis(Loc loc, ref IRState irs, Dsymbol fd, Dsymbol fdp = null, Dsymbol
 {
     if (auto fdn = fd.isFuncDeclaration())
     {
-        if (fdn.contextIsThis)
+        if (auto cv = fdn.contextVar)
         {
-            /* fd's context pointer is the `this` of the member function it is
-             * nested in, which is what getEthis() yields for that function.
+            /* fd's context pointer is the value of one of the variables of the
+             * function it is nested in (see inferContextVar), not a frame pointer.
+             * That's how to get it when fd is reached from outside of it; from
+             * inside fd, or a function nested in it, it's found by the walk below.
              */
-            return getEthis(loc, irs, fdn.toParent2(), null, origSc);
+            bool inside;
+            for (Dsymbol s = irs.getFunc(); s; s = s.toParent2())
+            {
+                if (s == fdn)
+                {
+                    inside = true;
+                    break;
+                }
+            }
+            if (!inside)
+            {
+                auto parent = fdn.toParent2().isFuncDeclaration();
+                assert(parent);
+                if (cv == parent.vthis)
+                    return getEthis(loc, irs, parent, null, origSc);   // the parent's `this`
+                return contextVarElem(loc, irs, cv);
+            }
         }
     }
 
@@ -411,11 +430,16 @@ elem* getEthis(Loc loc, ref IRState irs, Dsymbol fd, Dsymbol fdp = null, Dsymbol
             /* Remember that frames for functions that have no
              * nested references are skipped in the linked list
              * of frames, and that a function whose context pointer is
-             * its parent's `this` (contextIsThis) already has what the
+             * its parent's `this` (contextVar) already has what the
              * parent's frame would link to.
              */
             FuncDeclaration fdp2 = s.toParentP(ctxt0, ctxt1).isFuncDeclaration();
-            if (fdp2 && fdp2.hasNestedFrameRefs() && !(thisfd && thisfd.contextIsThis))
+            if (thisfd && thisfd.contextVar)
+            {
+                // only `this` can lead further out, through the aggregate's context
+                assert(fdp2 && thisfd.contextVar == fdp2.vthis);
+            }
+            else if (fdp2 && fdp2.hasNestedFrameRefs())
                 ethis = el_una(OPind, TYnptr, ethis);
 
             s = s.toParentP(ctxt0, ctxt1);
@@ -429,6 +453,25 @@ elem* getEthis(Loc loc, ref IRState irs, Dsymbol fd, Dsymbol fdp = null, Dsymbol
         printf("\n");
     }
     return ethis;
+}
+
+/*****************************
+ * The value of variable `v`, as seen from the current function, as a pointer:
+ * it is the context pointer of nested functions (see inferContextVar).
+ */
+private elem* contextVarElem(Loc loc, ref IRState irs, VarDeclaration v)
+{
+    Expression e = new VarExp(loc, v);
+    e.type = v.type;
+    if (v.type.toBasetype().isIntegral())
+    {
+        // widen to pointer size
+        e = new CastExp(loc, e, Type.tsize_t);
+        e.type = Type.tsize_t;
+    }
+    elem* el = toElemDtor(e, irs);
+    el.Ety = TYnptr;
+    return el;
 }
 
 /************************

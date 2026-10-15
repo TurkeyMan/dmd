@@ -49,7 +49,7 @@ import dmd.dsymbolsem : include, _isZeroInit, toAlias, isPOD;
 import dmd.dtemplate;
 import dmd.expression;
 import dmd.expressionsem;
-import dmd.funcsem : isVirtual, contextIsThisChild;
+import dmd.funcsem : isVirtual, contextVarChild;
 import dmd.func;
 import dmd.hdrgen;
 import dmd.id;
@@ -787,6 +787,26 @@ elem* toElem(Expression e, ref IRState irs)
         {
             if (fd && fd != irs.getFunc())
             {
+                auto cvc = contextVarChild(irs.getFunc(), fd);
+                if (cvc && cvc.contextVar == v && v != fd.vthis)
+                {
+                    /* v's value is the context pointer of cvc, the function we are
+                     * (nested) in, so read it from there and convert it back.
+                     */
+                    assert(se.op == EXP.variable);  // v's address is never taken
+                    Expression ex = new VarExp(se.loc, cvc.vthis);
+                    ex.type = cvc.vthis.type;
+                    if (v.type.toBasetype().isIntegral())
+                    {
+                        ex = new CastExp(se.loc, ex, Type.tsize_t);
+                        ex.type = Type.tsize_t;
+                        ex = new CastExp(se.loc, ex, v.type);
+                        ex.type = v.type;
+                    }
+                    e = toElem(ex, irs);
+                    goto L1;
+                }
+
                 // 'var' is a variable in an enclosing function.
                 elem* ethis = getEthis(se.loc, irs, fd, null, se.originalScope);
                 ethis = el_una(OPaddr, TYnptr, ethis);
@@ -812,7 +832,7 @@ elem* toElem(Expression e, ref IRState irs)
                 }
 
                 int soffset;
-                if (v && v == fd.vthis && contextIsThisChild(irs.getFunc(), fd))
+                if (cvc && cvc.contextVar == v)
                 {
                     /* fd's `this` isn't a frame variable for us: it is the
                      * context pointer of the function we are (nested) in, which

@@ -467,6 +467,7 @@ extern (C++) class VarDeclaration : Declaration
         bool isCmacro;          /// it is a C macro turned into a C declaration
         bool dllImport;         /// __declspec(dllimport)
         bool dllExport;         /// __declspec(dllexport)
+        bool usedAsLvalue;      /// used as an lvalue (assigned, address taken, bound to a ref) other than for its initialization
         mixin VarDeclarationExtra;
         bool systemInferred;    /// @system was inferred from initializer
     }

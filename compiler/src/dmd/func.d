@@ -113,8 +113,7 @@ private struct FUNCFLAG
     bool hasNoEH;            /// No exception unwinding is needed
     bool inferRetType;       /// Return type is to be inferred
     bool hasDualContext;     /// has a dual-context 'this' parameter
-    bool contextIsThis;      /// nested function whose context pointer is the enclosing member function's `this`
-    bool inferredContextIsThis; /// `contextIsThis` has been decided for the functions nested in this one
+    bool inferredContextVar; /// `contextVar` has been decided for the functions nested in this one
 
     bool hasAlwaysInlines;   /// Contains references to functions that must be inlined
     bool isCrtCtor;          /// Has attribute pragma(crt_constructor)
@@ -373,6 +372,13 @@ extern (C++) class FuncDeclaration : Declaration
      * (the inverse of closureVars)
      */
     VarDeclarations outerVars;
+
+    /** For a nested function: the variable of the enclosing function whose value
+     * is this function's context pointer, instead of the enclosing frame pointer
+     * (see `inferContextVar`). It is `vthis` of the enclosing member function
+     * for an anonymous member function.
+     */
+    VarDeclaration contextVar;
 
     // Most recent encountered `main` (`WinMain` or `DllMain`) function.
     // Track it to give error messages for multiple entrypoints

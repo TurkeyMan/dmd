@@ -2,7 +2,7 @@
 TEST_OUTPUT:
 ---
 fail_compilation/diag12829.d(15): Error: function `diag12829.test1` is `@nogc` yet allocates closure for `test1()` with the GC
-fail_compilation/diag12829.d(18):        delegate `() { int y = x; }` closes over variable `x`
+fail_compilation/diag12829.d(18):        delegate `() { int y = x++; }` closes over variable `x`
 fail_compilation/diag12829.d(17):        `x` declared here
 fail_compilation/diag12829.d(22):        function `bar` closes over variable `x`
 fail_compilation/diag12829.d(17):        `x` declared here
@@ -16,12 +16,12 @@ auto test1() @nogc
 {
     int x;
     void delegate() @nogc foo = () {
-        int y = x;
+        int y = x++;
     };
 
     void bar()
     {
-        int y = x;
+        int y = x++;
     }
     auto dg = &bar;
 }
