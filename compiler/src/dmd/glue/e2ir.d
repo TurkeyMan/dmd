@@ -49,7 +49,7 @@ import dmd.dsymbolsem : include, _isZeroInit, toAlias, isPOD;
 import dmd.dtemplate;
 import dmd.expression;
 import dmd.expressionsem;
-import dmd.funcsem : isVirtual;
+import dmd.funcsem : isVirtual, contextIsThisChild;
 import dmd.func;
 import dmd.hdrgen;
 import dmd.id;
@@ -812,7 +812,16 @@ elem* toElem(Expression e, ref IRState irs)
                 }
 
                 int soffset;
-                if (v && v.inClosure && !forceStackAccess)
+                if (v && v == fd.vthis && contextIsThisChild(irs.getFunc(), fd))
+                {
+                    /* fd's `this` isn't a frame variable for us: it is the
+                     * context pointer of the function we are (nested) in, which
+                     * getEthis() gave us as an lvalue, so ethis is now the
+                     * address of a slot holding it.
+                     */
+                    soffset = 0;
+                }
+                else if (v && v.inClosure && !forceStackAccess)
                     soffset = v.offset;
                 else if (v && v.inAlignSection)
                 {
